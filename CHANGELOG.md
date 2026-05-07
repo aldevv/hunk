@@ -10,6 +10,8 @@ All notable user-visible changes to Hunk are documented in this file.
 
 ### Fixed
 
+- Kept large dependency lockfile diffs on a cheaper plain-text path so big `package-lock.json`-style patches render faster.
+
 ## [0.10.0] - 2026-04-21
 
 ### Added
