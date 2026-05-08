@@ -6,7 +6,13 @@ All notable user-visible changes to Hunk are documented in this file.
 
 ### Added
 
+- Added file marking (`m` to toggle, `M` to clear all) so reviewed files can be hidden from the diff stream while staying visible (dimmed and crossed out) in the sidebar with a "<n> hidden" footer count.
+- Added `/` text search across the visible diff with `n` / `N` to step through matches, inline highlighting of all matches, and a stronger highlight on the active one.
+
 ### Changed
+
+- The file filter is now opened with `f` instead of `/`. Pressing `f` again with an empty filter exits filter mode. `f` is no longer a page-down alias.
+- `H` (was `m`) now toggles hunk metadata, freeing `m` for file marking.
 
 ### Fixed
 
