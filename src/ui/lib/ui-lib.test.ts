@@ -191,8 +191,9 @@ describe("ui helpers", () => {
     expect(isEscapeKey(createKeyEvent({ name: "esc" }))).toBe(true);
     expect(isPageDownKey(createKeyEvent({ name: "pagedown" }))).toBe(true);
     expect(isPageDownKey(createKeyEvent({ name: "space" }))).toBe(true);
-    expect(isPageDownKey(createKeyEvent({ name: "f" }))).toBe(true);
-    expect(isPageDownKey(createKeyEvent({ sequence: "f" }))).toBe(true);
+    // `f` is reserved for focusing the file filter; it must not double as page-down.
+    expect(isPageDownKey(createKeyEvent({ name: "f" }))).toBe(false);
+    expect(isPageDownKey(createKeyEvent({ sequence: "f" }))).toBe(false);
     expect(isPageUpKey(createKeyEvent({ name: "pageup" }))).toBe(true);
     expect(isPageUpKey(createKeyEvent({ name: "b" }))).toBe(true);
     expect(isPageUpKey(createKeyEvent({ sequence: "b" }))).toBe(true);

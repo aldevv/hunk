@@ -1457,7 +1457,7 @@ describe("App interactions", () => {
     }
   });
 
-  test("new shortcuts d, u, f, and Shift+Space are accepted without errors", async () => {
+  test("scroll shortcuts d, u, and Shift+Space are accepted without errors", async () => {
     const before =
       Array.from(
         { length: 50 },
@@ -1511,18 +1511,42 @@ describe("App interactions", () => {
       expect(frame).toContain("export const line");
 
       await act(async () => {
-        await setup.mockInput.pressKey("f");
-      });
-      await flush(setup);
-      frame = setup.captureCharFrame();
-      expect(frame).toContain("export const line");
-
-      await act(async () => {
         await setup.mockInput.pressKey(" ", { shift: true });
       });
       await flush(setup);
       frame = setup.captureCharFrame();
       expect(frame).toContain("export const line");
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
+  test("`f` focuses the filter and pressing `f` again with empty input exits filter mode", async () => {
+    const setup = await testRender(<AppHost bootstrap={createBootstrap()} />, {
+      width: 240,
+      height: 24,
+    });
+
+    try {
+      await flush(setup);
+
+      await act(async () => {
+        await setup.mockInput.pressKey("f");
+      });
+      await flush(setup);
+
+      let frame = setup.captureCharFrame();
+      expect(frame).toContain("filter:");
+
+      await act(async () => {
+        await setup.mockInput.pressKey("f");
+      });
+      await flush(setup);
+
+      frame = setup.captureCharFrame();
+      expect(frame).not.toContain("filter:");
     } finally {
       await act(async () => {
         setup.renderer.destroy();

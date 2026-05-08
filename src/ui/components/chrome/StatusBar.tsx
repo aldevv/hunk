@@ -9,6 +9,7 @@ export function StatusBar({
   terminalWidth,
   theme,
   onCloseMenu,
+  onFilterExit,
   onFilterInput,
   onFilterSubmit,
 }: {
@@ -18,6 +19,7 @@ export function StatusBar({
   terminalWidth: number;
   theme: AppTheme;
   onCloseMenu: () => void;
+  onFilterExit?: () => void;
   onFilterInput: (value: string) => void;
   onFilterSubmit: () => void;
 }) {
@@ -47,6 +49,17 @@ export function StatusBar({
             onInput={onFilterInput}
             onSubmit={onFilterSubmit}
             onKeyDown={(key) => {
+              // Pressing `f` again with an empty filter exits filter mode and returns
+              // focus to the file list. Handle it here (rather than in the global
+              // keyboard hook) so we can preventDefault before the input swallows the
+              // keystroke as text input.
+              if ((key.name === "f" || key.sequence === "f") && filter.length === 0) {
+                key.preventDefault();
+                key.stopPropagation();
+                onFilterExit?.();
+                return;
+              }
+
               if (!isEscapeKey(key)) {
                 return;
               }

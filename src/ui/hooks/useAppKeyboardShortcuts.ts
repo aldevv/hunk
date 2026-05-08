@@ -234,7 +234,9 @@ export function useAppKeyboardShortcuts({
       return true;
     }
 
-    // Let the focused input own filter editing and escape handling.
+    // Let the focused input own filter editing, escape handling, and the `f`-on-empty
+    // exit shortcut (handled in StatusBar so it can preventDefault before the input
+    // swallows the keystroke as text).
     return true;
   };
 
@@ -260,7 +262,7 @@ export function useAppKeyboardShortcuts({
       return;
     }
 
-    if (key.name === "/") {
+    if (key.name === "f" || key.sequence === "f") {
       focusFilter();
       return;
     }

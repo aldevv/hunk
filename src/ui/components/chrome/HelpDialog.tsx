@@ -21,7 +21,7 @@ export function HelpDialog({
       title: "Navigation",
       items: [
         ["↑ / ↓", "move line-by-line"],
-        ["Space / f", "page down (alt: f)"],
+        ["Space", "page down"],
         ["b", "page up"],
         ["Shift+Space", "page up (alt)"],
         ["d / u", "half page down / up"],
@@ -50,7 +50,7 @@ export function HelpDialog({
     {
       title: "Review",
       items: [
-        ["/", "focus file filter"],
+        ["f", "focus file filter"],
         ["m / M", "mark file / unmark all"],
         ["Tab", "toggle files/filter focus"],
         ["F10", "open menus"],

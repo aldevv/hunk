@@ -77,7 +77,7 @@ export function buildAppMenus({
     {
       kind: "item",
       label: "Focus filter",
-      hint: "/",
+      hint: "f",
       action: focusFilter,
     },
     { kind: "separator" },

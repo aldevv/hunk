@@ -472,6 +472,12 @@ export function App({
     setFocusArea((current) => (current === "files" ? "filter" : "files"));
   }, []);
 
+  /** Clear the active filter value and return focus to the file list. */
+  const clearFilterAndUnfocus = useCallback(() => {
+    review.setFilter("");
+    focusFiles();
+  }, [focusFiles, review.setFilter]);
+
   /** Cycle through the available built-in themes. */
   const cycleTheme = useCallback(() => {
     const currentIndex = THEMES.findIndex((theme) => theme.id === activeTheme.id);
@@ -763,6 +769,7 @@ export function App({
           terminalWidth={terminal.width}
           theme={activeTheme}
           onCloseMenu={closeMenu}
+          onFilterExit={clearFilterAndUnfocus}
           onFilterInput={review.setFilter}
           onFilterSubmit={focusFiles}
         />

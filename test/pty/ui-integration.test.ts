@@ -443,7 +443,7 @@ describe("live UI integration", () => {
     }
   });
 
-  test("slash focuses the filter and narrows the visible review stream", async () => {
+  test("`f` focuses the filter and narrows the visible review stream", async () => {
     const fixture = harness.createSidebarJumpRepoFixture();
     const session = await harness.launchHunk({
       args: ["diff", "--mode", "split"],
@@ -460,7 +460,7 @@ describe("live UI integration", () => {
       expect(initial).toContain("alphaOnly = true");
       expect(initial).toContain("betaValue = 2");
 
-      await session.type("/");
+      await session.type("f");
       await harness.waitForSnapshot(
         session,
         (text) => text.includes("filter: type to filter files"),
@@ -481,6 +481,29 @@ describe("live UI integration", () => {
       expect(filtered).toContain("delta");
       expect(filtered).toContain("deltaOnly = true");
       expect(filtered).not.toContain("alphaOnly = true");
+
+      // Esc with a non-empty filter clears the input but keeps the filter focused so
+      // typing can resume immediately.
+      await session.press("escape");
+      const cleared = await harness.waitForSnapshot(
+        session,
+        (text) =>
+          text.includes("filter: type to filter files") && text.includes("alphaOnly = true"),
+        5_000,
+      );
+      expect(cleared).toContain("filter: type to filter files");
+      expect(cleared).toContain("alphaOnly = true");
+
+      // Pressing `f` again with an empty filter exits filter mode entirely, returning
+      // focus to the file list and dropping the inline filter input from the status bar.
+      await session.type("f");
+      const exited = await harness.waitForSnapshot(
+        session,
+        (text) => !text.includes("filter: type to filter files"),
+        5_000,
+      );
+      expect(exited).not.toContain("filter: type to filter files");
+      expect(exited).toContain("alphaOnly = true");
     } finally {
       session.close();
     }
