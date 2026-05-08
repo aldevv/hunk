@@ -299,19 +299,12 @@ export function useAppKeyboardShortcuts({
       return;
     }
 
-    // `n` / `N` are reserved for navigating committed search matches. They only fire when
-    // search is not currently focused (the input owns editing) and there is at least one
-    // committed match so the keystroke does not silently no-op for users who haven't searched.
     if (
       (key.name === "n" || key.sequence === "n" || key.sequence === "N") &&
       searchHasMatchesRef.current
     ) {
       const goingBackward = key.shift || key.sequence === "N";
-      if (goingBackward) {
-        runAndCloseMenu(moveSearchCursorPrev);
-      } else {
-        runAndCloseMenu(moveSearchCursorNext);
-      }
+      runAndCloseMenu(goingBackward ? moveSearchCursorPrev : moveSearchCursorNext);
       return;
     }
 

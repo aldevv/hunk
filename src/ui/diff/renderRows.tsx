@@ -944,10 +944,8 @@ function renderRow(
       fg: guideOnOldSide ? theme.noteBorder : stackRailColor(row.cell.kind, theme, selected),
       bg: theme.panel,
     };
-    // Stack rows show one cell per source line. Pick the side that owns the line number so
-    // search highlights anchor onto the correct side without ambiguity.
-    const stackSide: "old" | "new" =
-      row.cell.kind === "deletion" ? "old" : row.cell.kind === "addition" ? "new" : "new";
+    // Pick the side that owns the line number so search highlights anchor without ambiguity.
+    const stackSide: "old" | "new" = row.cell.kind === "deletion" ? "old" : "new";
     const stackLineNumber = stackSide === "old" ? row.cell.oldLineNumber : row.cell.newLineNumber;
     const stackHighlightRanges = buildHighlightRangesForCell(
       searchOverlay,

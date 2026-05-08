@@ -38,8 +38,6 @@ export interface BuildReviewStateOptions {
 
 export interface ReviewState {
   allFiles: DiffFile[];
-  /** All files minus the user-marked ones, before any filter is applied. */
-  unmarkedFiles: DiffFile[];
   visibleFiles: DiffFile[];
   /** How many files the active mark set is hiding from the review stream. */
   hiddenByMarkCount: number;
@@ -83,7 +81,6 @@ export function buildReviewState({
 
   return {
     allFiles,
-    unmarkedFiles,
     visibleFiles,
     hiddenByMarkCount,
     sidebarEntries: buildSidebarEntries(sidebarFiles, { markedFileIds }),

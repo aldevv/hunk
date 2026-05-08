@@ -9,8 +9,7 @@
  * side per hunk, and ascending column within a line.
  */
 import type { DiffFile } from "../../core/types";
-
-export type SearchMatchSide = "old" | "new";
+import type { DiffSide } from "../../hunk-session/types";
 
 export interface SearchMatch {
   fileId: string;
@@ -20,7 +19,7 @@ export interface SearchMatch {
    * after deletion rows, so emitting "old" before "new" here keeps the result
    * order aligned with the rendered review stream.
    */
-  side: SearchMatchSide;
+  side: DiffSide;
   /** Absolute line number on that side (1-based). */
   line: number;
   /** Column start in the line text (0-based). */
@@ -33,7 +32,7 @@ export interface SearchMatch {
 function collectMatchesForLine(
   fileId: string,
   hunkIndex: number,
-  side: SearchMatchSide,
+  side: DiffSide,
   lineNumber: number,
   lineText: string,
   query: string,
@@ -141,20 +140,13 @@ export function moveSearchCursor(cursor: number, delta: number, matchCount: numb
 }
 
 /** Stable lookup key shared by `DiffRowView` and the highlight-builder. */
-export function searchRowKey(
-  fileId: string,
-  hunkIndex: number,
-  side: SearchMatchSide,
-  line: number,
-) {
+export function searchRowKey(fileId: string, hunkIndex: number, side: DiffSide, line: number) {
   return `${fileId}|${hunkIndex}|${side}|${line}`;
 }
 
 export interface SearchMatchByRow {
   /** All matches (active or not) grouped by `searchRowKey`. */
   byRow: Map<string, SearchMatch[]>;
-  /** Stable key of the active match's row, or null when there is no cursor target. */
-  activeRowKey: string | null;
   /** Identity of the active match within its row, used by row-level renderers to set active styling. */
   activeMatch: SearchMatch | null;
 }
@@ -176,9 +168,5 @@ export function groupSearchMatchesByRow(
   }
 
   const activeMatch = matches.length > 0 ? (matches[activeIndex] ?? null) : null;
-  const activeRowKey = activeMatch
-    ? searchRowKey(activeMatch.fileId, activeMatch.hunkIndex, activeMatch.side, activeMatch.line)
-    : null;
-
-  return { byRow, activeRowKey, activeMatch };
+  return { byRow, activeMatch };
 }

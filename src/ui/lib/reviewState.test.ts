@@ -39,7 +39,6 @@ describe("buildReviewState marked files", () => {
     );
 
     expect(state.visibleFiles.map((file) => file.id)).toEqual(["beta"]);
-    expect(state.unmarkedFiles.map((file) => file.id)).toEqual(["beta"]);
     expect(state.hiddenByMarkCount).toBe(1);
 
     const fileEntries = state.sidebarEntries.filter((entry) => entry.kind === "file");
@@ -71,7 +70,6 @@ describe("buildReviewState marked files", () => {
     );
 
     expect(state.visibleFiles.map((file) => file.id)).toEqual([]);
-    expect(state.unmarkedFiles.map((file) => file.id)).toEqual(["beta"]);
     expect(state.hiddenByMarkCount).toBe(1);
     // The sidebar still respects the filter so the user sees a narrow consistent view, but
     // the matched alpha entry is flagged as marked so it stays unmarkable.

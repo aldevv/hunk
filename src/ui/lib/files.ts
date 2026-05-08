@@ -76,11 +76,28 @@ export function sidebarEntryStatsWidth(
   );
 }
 
-/** Merge one file-id keyed annotation map into the review stream file list. */
+/** Merge one file-id keyed annotation map into the review stream file list.
+ *
+ * Returns the input array reference unchanged when no annotation entry matches
+ * any file, so downstream useMemo / memo equality checks stay stable across
+ * unrelated review state changes (hunk navigation, scrolling).
+ */
 export function mergeFileAnnotationsByFileId<T extends AgentAnnotation>(
   files: DiffFile[],
   annotationsByFileId: Record<string, T[]>,
 ): DiffFile[] {
+  let touched = false;
+  for (const file of files) {
+    const annotations = annotationsByFileId[file.id];
+    if (annotations && annotations.length > 0) {
+      touched = true;
+      break;
+    }
+  }
+  if (!touched) {
+    return files;
+  }
+
   return files.map((file) => {
     const annotations = annotationsByFileId[file.id];
     if (!annotations || annotations.length === 0) {

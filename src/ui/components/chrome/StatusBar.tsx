@@ -34,7 +34,7 @@ export function StatusBar({
   searchQuery?: string;
   /** Total committed match count for the active query. */
   searchMatchCount?: number;
-  /** 0-based cursor into the committed match list, used to render the M/N indicator. */
+  /** 0-based cursor into the committed match list. */
   searchCurrentIndex?: number;
   onCloseMenu: () => void;
   onFilterExit?: () => void;
@@ -44,8 +44,6 @@ export function StatusBar({
   onSearchInput?: (value: string) => void;
   onSearchSubmit?: () => void;
 }) {
-  // Filter and search are mutually exclusive. If both flags somehow land on, prefer filter so we
-  // don't double-render two focused inputs.
   const showSearchInput = searchActive && !filterFocused;
   const indicatorText =
     searchMatchCount > 0 ? `${searchCurrentIndex + 1}/${searchMatchCount}` : "0/0";

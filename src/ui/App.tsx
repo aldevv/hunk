@@ -25,7 +25,13 @@ import { useReviewController } from "./hooks/useReviewController";
 import { buildAppMenus } from "./lib/appMenus";
 import { fileRowId } from "./lib/ids";
 import { resolveResponsiveLayout } from "./lib/responsive";
-import { findSearchMatches, groupSearchMatchesByRow, type SearchMatch } from "./lib/searchMatches";
+import {
+  findSearchMatches,
+  groupSearchMatchesByRow,
+  moveSearchCursor as wrapSearchCursor,
+  searchMatchAt,
+  type SearchMatch,
+} from "./lib/searchMatches";
 import { resizeSidebarWidth } from "./lib/sidebar";
 import { resolveTheme, THEMES } from "./themes";
 
@@ -130,19 +136,13 @@ export function App({
   const clearMarkedFiles = review.clearMarkedFiles;
   const hiddenByMarkCount = review.hiddenByMarkCount;
 
-  // Search consumes only what the user can actually see. Marked or filtered-out files contribute
-  // no matches because they are absent from `review.visibleFiles`.
   const searchMatches: SearchMatch[] = useMemo(
     () => (review.searchQuery ? findSearchMatches(review.visibleFiles, review.searchQuery) : []),
     [review.searchQuery, review.visibleFiles],
   );
   const searchMatchCount = searchMatches.length;
-  const safeSearchCursor =
-    searchMatchCount === 0
-      ? 0
-      : ((review.searchMatchCursor % searchMatchCount) + searchMatchCount) % searchMatchCount;
-  const activeSearchMatch =
-    searchMatchCount === 0 ? null : (searchMatches[safeSearchCursor] ?? null);
+  const safeSearchCursor = wrapSearchCursor(review.searchMatchCursor, 0, searchMatchCount);
+  const activeSearchMatch = searchMatchAt(searchMatches, review.searchMatchCursor) ?? null;
   const searchOverlay = useMemo(
     () =>
       searchMatchCount === 0 ? null : groupSearchMatchesByRow(searchMatches, safeSearchCursor),
@@ -150,7 +150,6 @@ export function App({
   );
   const searchMatchesByRow = searchOverlay?.byRow;
 
-  /** Toggle the focused file's mark via the global `m` shortcut. */
   const toggleSelectedFileMark = useCallback(() => {
     if (!selectedFile) {
       return;
@@ -158,8 +157,8 @@ export function App({
     toggleMarkedFile(selectedFile.id);
   }, [selectedFile, toggleMarkedFile]);
 
-  // Track the active match identity so we navigate exactly once per change. Using the match object
-  // identity keeps the effect quiet when search-unrelated state churn touches the App tree.
+  // Match identity (rather than cursor index) keeps the navigation effect quiet
+  // when unrelated App state churn rebuilds the match list reference.
   const lastNavigatedMatchRef = useRef<SearchMatch | null>(null);
   useEffect(() => {
     if (!activeSearchMatch) {
@@ -510,36 +509,30 @@ export function App({
     setFocusArea((current) => (current === "files" ? "filter" : "files"));
   }, []);
 
-  /** Clear the active filter value and return focus to the file list. */
   const clearFilterAndUnfocus = useCallback(() => {
     review.setFilter("");
     focusFiles();
   }, [focusFiles, review.setFilter]);
 
-  /** Open the search input in the status bar and seed it from the active query. */
   const beginSearchAndFocus = useCallback(() => {
     review.beginSearch();
     setFocusArea("search");
   }, [review.beginSearch]);
 
-  /** Cancel the active search, drop highlights, and return focus to the file list. */
   const cancelSearchAndUnfocus = useCallback(() => {
     review.cancelSearch();
     focusFiles();
   }, [focusFiles, review.cancelSearch]);
 
-  /** Commit the typed search draft and move focus back to the diff stream. */
   const commitSearchAndUnfocus = useCallback(() => {
     review.commitSearch();
     focusFiles();
   }, [focusFiles, review.commitSearch]);
 
-  /** Move forward through committed search matches; safe to call when there are none. */
   const moveSearchCursorNext = useCallback(() => {
     review.moveSearchCursor(1, searchMatchCount);
   }, [review.moveSearchCursor, searchMatchCount]);
 
-  /** Move backward through committed search matches; safe to call when there are none. */
   const moveSearchCursorPrev = useCallback(() => {
     review.moveSearchCursor(-1, searchMatchCount);
   }, [review.moveSearchCursor, searchMatchCount]);
