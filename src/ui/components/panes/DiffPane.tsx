@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { DiffFile, LayoutMode } from "../../../core/types";
 import type { VisibleAgentNote } from "../../lib/agentAnnotations";
+import type { SearchMatch } from "../../lib/searchMatches";
 import { computeHunkRevealScrollTop } from "../../lib/hunkScroll";
 import {
   measureDiffSectionGeometry,
@@ -149,6 +150,8 @@ export function DiffPane({
   selectedHunkRevealRequestId,
   theme,
   width,
+  searchMatchesByRow,
+  searchActiveMatch,
   onOpenAgentNotesAtHunk,
   onScrollCodeHorizontally = () => {},
   onSelectFile,
@@ -177,6 +180,8 @@ export function DiffPane({
   selectedHunkRevealRequestId?: number;
   theme: AppTheme;
   width: number;
+  searchMatchesByRow?: Map<string, SearchMatch[]>;
+  searchActiveMatch?: SearchMatch | null;
   onOpenAgentNotesAtHunk: (fileId: string, hunkIndex: number) => void;
   onScrollCodeHorizontally?: (delta: number) => void;
   onSelectFile: (fileId: string) => void;
@@ -1093,6 +1098,8 @@ export function DiffPane({
                       visibleAgentNotes={
                         visibleAgentNotesByFile.get(file.id) ?? EMPTY_VISIBLE_AGENT_NOTES
                       }
+                      searchMatchesByRow={searchMatchesByRow}
+                      searchActiveMatch={searchActiveMatch}
                       onOpenAgentNotesAtHunk={(hunkIndex) =>
                         onOpenAgentNotesAtHunk(file.id, hunkIndex)
                       }

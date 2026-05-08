@@ -51,6 +51,8 @@ export function HelpDialog({
       title: "Review",
       items: [
         ["f", "focus file filter"],
+        ["/", "search diff text"],
+        ["n / N", "next / previous match"],
         ["m / M", "mark file / unmark all"],
         ["Tab", "toggle files/filter focus"],
         ["F10", "open menus"],

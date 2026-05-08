@@ -420,6 +420,183 @@ describe("useReviewController", () => {
     }
   });
 
+  test("beginSearch flips active true and seeds the draft from the committed query", async () => {
+    const controllerRef: { current: ReviewController | null } = { current: null };
+    const setup = await testRender(
+      <ReviewControllerHarness
+        initialFiles={[
+          createDiffFile(
+            "alpha",
+            "alpha.ts",
+            "export const alpha = 1;\n",
+            "export const alpha = 2;\n",
+          ),
+        ]}
+        onController={(nextController) => {
+          controllerRef.current = nextController;
+        }}
+      />,
+      { width: 80, height: 4 },
+    );
+
+    try {
+      await flush(setup);
+      expect(expectValue(controllerRef.current).searchActive).toBe(false);
+
+      await act(async () => {
+        expectValue(controllerRef.current).setSearchDraft("alpha");
+      });
+      await flush(setup);
+      await act(async () => {
+        expectValue(controllerRef.current).commitSearch();
+      });
+      await flush(setup);
+
+      // Close and reopen to verify the draft repopulates from the committed query.
+      await act(async () => {
+        expectValue(controllerRef.current).cancelSearch();
+      });
+      await flush(setup);
+
+      // Set a new query and beginSearch; the draft should mirror whatever query is current.
+      await act(async () => {
+        expectValue(controllerRef.current).setSearchDraft("beta");
+      });
+      await flush(setup);
+      await act(async () => {
+        expectValue(controllerRef.current).commitSearch();
+      });
+      await flush(setup);
+      await act(async () => {
+        expectValue(controllerRef.current).beginSearch();
+      });
+      await flush(setup);
+
+      expect(expectValue(controllerRef.current).searchActive).toBe(true);
+      expect(expectValue(controllerRef.current).searchDraft).toBe("beta");
+      expect(expectValue(controllerRef.current).searchQuery).toBe("beta");
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
+  test("cancelSearch clears query, draft, cursor, and the active flag together", async () => {
+    const controllerRef: { current: ReviewController | null } = { current: null };
+    const setup = await testRender(
+      <ReviewControllerHarness
+        initialFiles={[
+          createDiffFile(
+            "alpha",
+            "alpha.ts",
+            "export const alpha = 1;\n",
+            "export const alpha = 2;\n",
+          ),
+        ]}
+        onController={(nextController) => {
+          controllerRef.current = nextController;
+        }}
+      />,
+      { width: 80, height: 4 },
+    );
+
+    try {
+      await flush(setup);
+
+      // Each action depends on the previous render flushing — `commitSearch` reads `searchDraft`
+      // from the closure of the latest render, so chain them through separate `act` blocks.
+      await act(async () => {
+        expectValue(controllerRef.current).beginSearch();
+      });
+      await flush(setup);
+      await act(async () => {
+        expectValue(controllerRef.current).setSearchDraft("alpha");
+      });
+      await flush(setup);
+      await act(async () => {
+        expectValue(controllerRef.current).commitSearch();
+      });
+      await flush(setup);
+      await act(async () => {
+        expectValue(controllerRef.current).moveSearchCursor(2, 5);
+      });
+      await flush(setup);
+
+      expect(expectValue(controllerRef.current).searchQuery).toBe("alpha");
+      expect(expectValue(controllerRef.current).searchMatchCursor).toBe(2);
+
+      await act(async () => {
+        expectValue(controllerRef.current).cancelSearch();
+      });
+      await flush(setup);
+
+      expect(expectValue(controllerRef.current).searchActive).toBe(false);
+      expect(expectValue(controllerRef.current).searchQuery).toBe("");
+      expect(expectValue(controllerRef.current).searchDraft).toBe("");
+      expect(expectValue(controllerRef.current).searchMatchCursor).toBe(0);
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
+  test("moveSearchCursor wraps modulo matchCount in both directions", async () => {
+    const controllerRef: { current: ReviewController | null } = { current: null };
+    const setup = await testRender(
+      <ReviewControllerHarness
+        initialFiles={[
+          createDiffFile(
+            "alpha",
+            "alpha.ts",
+            "export const alpha = 1;\n",
+            "export const alpha = 2;\n",
+          ),
+        ]}
+        onController={(nextController) => {
+          controllerRef.current = nextController;
+        }}
+      />,
+      { width: 80, height: 4 },
+    );
+
+    try {
+      await flush(setup);
+
+      await act(async () => {
+        expectValue(controllerRef.current).moveSearchCursor(1, 3);
+      });
+      await flush(setup);
+      expect(expectValue(controllerRef.current).searchMatchCursor).toBe(1);
+
+      await act(async () => {
+        expectValue(controllerRef.current).moveSearchCursor(1, 3);
+        expectValue(controllerRef.current).moveSearchCursor(1, 3);
+      });
+      await flush(setup);
+      // 1 -> 2 -> 0 (wraps)
+      expect(expectValue(controllerRef.current).searchMatchCursor).toBe(0);
+
+      await act(async () => {
+        expectValue(controllerRef.current).moveSearchCursor(-1, 3);
+      });
+      await flush(setup);
+      expect(expectValue(controllerRef.current).searchMatchCursor).toBe(2);
+
+      // matchCount of 0 should reset the cursor to 0.
+      await act(async () => {
+        expectValue(controllerRef.current).moveSearchCursor(5, 0);
+      });
+      await flush(setup);
+      expect(expectValue(controllerRef.current).searchMatchCursor).toBe(0);
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
   test("batch live comments do not mutate state when any target is invalid", async () => {
     const controllerRef: { current: ReviewController | null } = { current: null };
     const setup = await testRender(

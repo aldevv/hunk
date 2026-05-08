@@ -122,10 +122,13 @@ describe("ui helpers", () => {
   test("buildAppMenus creates checked entries from the current app state", () => {
     const menus = buildAppMenus({
       activeThemeId: "graphite",
+      beginSearch: () => {},
       canRefreshCurrentInput: true,
       clearMarkedFiles: () => {},
       focusFilter: () => {},
       layoutMode: "stack",
+      moveSearchCursorNext: () => {},
+      moveSearchCursorPrev: () => {},
       moveToAnnotatedFile: () => {},
       moveToAnnotatedHunk: () => {},
       moveToHunk: () => {},

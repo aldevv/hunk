@@ -14,7 +14,7 @@ import {
   isStepUpKey,
 } from "../lib/keyboard";
 
-type FocusArea = "files" | "filter";
+type FocusArea = "files" | "filter" | "search";
 type ScrollUnit = "step" | "viewport" | "content" | "half";
 
 const FAST_CODE_HORIZONTAL_SCROLL_COLUMNS = 8;
@@ -22,6 +22,7 @@ const FAST_CODE_HORIZONTAL_SCROLL_COLUMNS = 8;
 export interface UseAppKeyboardShortcutsOptions {
   activeMenuId: MenuId | null;
   activateCurrentMenuItem: () => void;
+  beginSearch: () => void;
   canRefreshCurrentInput: boolean;
   clearMarkedFiles: () => void;
   closeHelp: () => void;
@@ -29,6 +30,8 @@ export interface UseAppKeyboardShortcutsOptions {
   cycleTheme: () => void;
   focusArea: FocusArea;
   focusFilter: () => void;
+  moveSearchCursorNext: () => void;
+  moveSearchCursorPrev: () => void;
   moveToAnnotatedHunk: (delta: number) => void;
   moveToHunk: (delta: number) => void;
   moveMenuItem: (delta: number) => void;
@@ -37,6 +40,8 @@ export interface UseAppKeyboardShortcutsOptions {
   requestQuit: () => void;
   scrollCodeHorizontally: (delta: number) => void;
   scrollDiff: (delta: number, unit: ScrollUnit) => void;
+  /** Whether there is at least one committed search match to navigate. */
+  searchHasMatches: boolean;
   selectLayoutMode: (mode: LayoutMode) => void;
   showHelp: boolean;
   switchMenu: (delta: number) => void;
@@ -55,6 +60,7 @@ export interface UseAppKeyboardShortcutsOptions {
 export function useAppKeyboardShortcuts({
   activeMenuId,
   activateCurrentMenuItem,
+  beginSearch,
   canRefreshCurrentInput,
   clearMarkedFiles,
   closeHelp,
@@ -62,6 +68,8 @@ export function useAppKeyboardShortcuts({
   cycleTheme,
   focusArea,
   focusFilter,
+  moveSearchCursorNext,
+  moveSearchCursorPrev,
   moveToAnnotatedHunk,
   moveToHunk,
   moveMenuItem,
@@ -70,6 +78,7 @@ export function useAppKeyboardShortcuts({
   requestQuit,
   scrollCodeHorizontally,
   scrollDiff,
+  searchHasMatches,
   selectLayoutMode,
   showHelp,
   switchMenu,
@@ -87,11 +96,13 @@ export function useAppKeyboardShortcuts({
   const focusAreaRef = useRef(focusArea);
   const pagerModeRef = useRef(pagerMode);
   const showHelpRef = useRef(showHelp);
+  const searchHasMatchesRef = useRef(searchHasMatches);
 
   activeMenuIdRef.current = activeMenuId;
   focusAreaRef.current = focusArea;
   pagerModeRef.current = pagerMode;
   showHelpRef.current = showHelp;
+  searchHasMatchesRef.current = searchHasMatches;
 
   const runAndCloseMenu = (action: () => void) => {
     action();
@@ -240,6 +251,22 @@ export function useAppKeyboardShortcuts({
     return true;
   };
 
+  const handleSearchShortcut = (key: KeyEvent) => {
+    if (focusAreaRef.current !== "search") {
+      return false;
+    }
+
+    if (key.name === "tab") {
+      toggleFocusArea();
+      return true;
+    }
+
+    // Mirror the filter pattern: the focused input owns text editing, Esc handling, and the
+    // `/`-on-empty-exit shortcut (handled in StatusBar so it can preventDefault before the
+    // input swallows the keystroke as text input).
+    return true;
+  };
+
   const handleAppShortcut = (key: KeyEvent) => {
     if (key.name === "q") {
       requestQuit();
@@ -264,6 +291,27 @@ export function useAppKeyboardShortcuts({
 
     if (key.name === "f" || key.sequence === "f") {
       focusFilter();
+      return;
+    }
+
+    if (key.name === "/" || key.sequence === "/") {
+      runAndCloseMenu(beginSearch);
+      return;
+    }
+
+    // `n` / `N` are reserved for navigating committed search matches. They only fire when
+    // search is not currently focused (the input owns editing) and there is at least one
+    // committed match so the keystroke does not silently no-op for users who haven't searched.
+    if (
+      (key.name === "n" || key.sequence === "n" || key.sequence === "N") &&
+      searchHasMatchesRef.current
+    ) {
+      const goingBackward = key.shift || key.sequence === "N";
+      if (goingBackward) {
+        runAndCloseMenu(moveSearchCursorPrev);
+      } else {
+        runAndCloseMenu(moveSearchCursorNext);
+      }
       return;
     }
 
@@ -418,6 +466,10 @@ export function useAppKeyboardShortcuts({
     }
 
     if (handleFilterShortcut(key)) {
+      return;
+    }
+
+    if (handleSearchShortcut(key)) {
       return;
     }
 

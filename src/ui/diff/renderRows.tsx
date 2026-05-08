@@ -1,12 +1,15 @@
 import { memo, type ReactNode } from "react";
 import type { DiffFile } from "../../core/types";
 import type { AppTheme } from "../themes";
+import type { SearchMatch } from "../lib/searchMatches";
+import { searchRowKey } from "../lib/searchMatches";
 import {
   resolveSplitCellGeometry,
   resolveSplitPaneWidths,
   resolveStackCellGeometry,
 } from "./codeColumns";
 import type { DiffRow, RenderSpan, SplitLineCell, StackLineCell } from "./pierre";
+import { applySearchHighlights, type SearchHighlightRange } from "./searchHighlight";
 import { blendHex } from "../lib/color";
 
 /** Clamp a label to one terminal row with an ellipsis. */
@@ -24,6 +27,53 @@ export function fitText(text: string, width: number) {
   }
 
   return `${text.slice(0, width - 1)}…`;
+}
+
+interface SearchOverlay {
+  /** Lookup of all matches grouped by `searchRowKey`. */
+  byRow: Map<string, SearchMatch[]>;
+  /** Identity of the cursor-current match, used so its row can render the active palette. */
+  activeMatch: SearchMatch | null;
+  /** Theme palette for inactive and active highlights. */
+  theme: AppTheme;
+}
+
+/** Build the highlight range list for one cell, marking the active match where applicable. */
+function buildHighlightRangesForCell(
+  overlay: SearchOverlay | undefined,
+  fileId: string,
+  hunkIndex: number,
+  side: SearchMatch["side"],
+  lineNumber: number | undefined,
+): SearchHighlightRange[] {
+  if (!overlay || lineNumber === undefined) {
+    return [];
+  }
+
+  const matches = overlay.byRow.get(searchRowKey(fileId, hunkIndex, side, lineNumber));
+  if (!matches || matches.length === 0) {
+    return [];
+  }
+
+  const activeMatch = overlay.activeMatch;
+  return matches.map((match) => ({
+    start: match.start,
+    end: match.end,
+    active: activeMatch !== null && match === activeMatch,
+  }));
+}
+
+/** Apply search highlights to a span list when any ranges are present. */
+function applyOverlayToSpans(spans: RenderSpan[], ranges: SearchHighlightRange[], theme: AppTheme) {
+  if (ranges.length === 0) {
+    return spans;
+  }
+  return applySearchHighlights(spans, ranges, {
+    matchBg: theme.searchHighlightBg,
+    matchFg: theme.searchHighlightFg,
+    activeMatchBg: theme.searchActiveHighlightBg,
+    activeMatchFg: theme.searchActiveHighlightFg,
+  });
 }
 
 /** Slice styled spans to one visible window while preserving color runs. */
@@ -301,6 +351,7 @@ function buildWrappedSplitCell(
   showLineNumbers: boolean,
   prefixWidth: number,
   theme: AppTheme,
+  highlightSpans?: RenderSpan[],
 ) {
   const palette = splitCellPalette(cell.kind, theme);
   const { gutterWidth, contentWidth } = resolveSplitCellGeometry(
@@ -314,7 +365,7 @@ function buildWrappedSplitCell(
         gutterWidth,
       )
     : `${cell.sign} `.padEnd(gutterWidth);
-  const wrappedSpans = wrapSpans(cell.spans, contentWidth);
+  const wrappedSpans = wrapSpans(highlightSpans ?? cell.spans, contentWidth);
 
   return {
     gutterWidth,
@@ -334,6 +385,7 @@ function buildWrappedStackCell(
   showLineNumbers: boolean,
   prefixWidth: number,
   theme: AppTheme,
+  highlightSpans?: RenderSpan[],
 ) {
   const palette = stackCellPalette(cell.kind, theme);
   const { gutterWidth, contentWidth } = resolveStackCellGeometry(
@@ -351,7 +403,7 @@ function buildWrappedStackCell(
   const firstGutterText = (
     showLineNumbers ? `${oldNumber} ${newNumber} ${cell.sign}` : `${cell.sign} `
   ).padEnd(gutterWidth);
-  const wrappedSpans = wrapSpans(cell.spans, contentWidth);
+  const wrappedSpans = wrapSpans(highlightSpans ?? cell.spans, contentWidth);
 
   return {
     gutterWidth,
@@ -377,6 +429,7 @@ function renderSplitCell(
     fg: string;
     bg: string;
   },
+  highlightSpans?: RenderSpan[],
 ) {
   const palette = splitCellPalette(cell.kind, theme);
   const prefixWidth = prefix?.text.length ?? 0;
@@ -403,7 +456,7 @@ function renderSplitCell(
         {gutterText}
       </span>
       {renderInlineSpans(
-        cell.spans,
+        highlightSpans ?? cell.spans,
         contentWidth,
         theme.text,
         palette.contentBg,
@@ -428,6 +481,7 @@ function renderStackCell(
     fg: string;
     bg: string;
   },
+  highlightSpans?: RenderSpan[],
 ) {
   const palette = stackCellPalette(cell.kind, theme);
   const prefixWidth = prefix?.text.length ?? 0;
@@ -458,7 +512,7 @@ function renderStackCell(
         )}
       </span>
       {renderInlineSpans(
-        cell.spans,
+        highlightSpans ?? cell.spans,
         contentWidth,
         theme.text,
         palette.contentBg,
@@ -716,6 +770,7 @@ function renderRow(
   anchorId?: string,
   noteGuideSide?: "old" | "new",
   onOpenAgentNotesAtHunk?: (hunkIndex: number) => void,
+  searchOverlay?: SearchOverlay,
 ) {
   let baseRow: ReactNode;
 
@@ -750,6 +805,29 @@ function renderRow(
       fg: splitRightRailColor(row.right.kind, theme, selected),
       bg: theme.panel,
     };
+    // Search highlights are stored per (fileId, hunkIndex, side, line). Each side of a split row
+    // owns its own spans, so build the override list once per cell and reuse it for the wrap and
+    // no-wrap branches below.
+    const leftHighlightRanges = buildHighlightRangesForCell(
+      searchOverlay,
+      row.fileId,
+      row.hunkIndex,
+      "old",
+      row.left.lineNumber,
+    );
+    const rightHighlightRanges = buildHighlightRangesForCell(
+      searchOverlay,
+      row.fileId,
+      row.hunkIndex,
+      "new",
+      row.right.lineNumber,
+    );
+    const leftHighlightSpans = searchOverlay
+      ? applyOverlayToSpans(row.left.spans, leftHighlightRanges, theme)
+      : undefined;
+    const rightHighlightSpans = searchOverlay
+      ? applyOverlayToSpans(row.right.spans, rightHighlightRanges, theme)
+      : undefined;
 
     if (!wrapLines) {
       baseRow = (
@@ -764,6 +842,7 @@ function renderRow(
               `${row.key}:left`,
               codeHorizontalOffset,
               leftPrefix,
+              leftHighlightSpans,
             )}
             {renderSplitCell(
               row.right,
@@ -774,6 +853,7 @@ function renderRow(
               `${row.key}:right`,
               codeHorizontalOffset,
               rightPrefix,
+              rightHighlightSpans,
             )}
             {guideOnNewSide ? (
               <span key={`${row.key}:note-guide`} fg={theme.noteBorder}>
@@ -791,6 +871,7 @@ function renderRow(
         showLineNumbers,
         leftPrefix.text.length,
         theme,
+        leftHighlightSpans,
       );
       const rightLayout = buildWrappedSplitCell(
         row.right,
@@ -799,6 +880,7 @@ function renderRow(
         showLineNumbers,
         rightPrefix.text.length,
         theme,
+        rightHighlightSpans,
       );
       const leftContentWidth = Math.max(
         0,
@@ -862,6 +944,21 @@ function renderRow(
       fg: guideOnOldSide ? theme.noteBorder : stackRailColor(row.cell.kind, theme, selected),
       bg: theme.panel,
     };
+    // Stack rows show one cell per source line. Pick the side that owns the line number so
+    // search highlights anchor onto the correct side without ambiguity.
+    const stackSide: "old" | "new" =
+      row.cell.kind === "deletion" ? "old" : row.cell.kind === "addition" ? "new" : "new";
+    const stackLineNumber = stackSide === "old" ? row.cell.oldLineNumber : row.cell.newLineNumber;
+    const stackHighlightRanges = buildHighlightRangesForCell(
+      searchOverlay,
+      row.fileId,
+      row.hunkIndex,
+      stackSide,
+      stackLineNumber,
+    );
+    const stackHighlightSpans = searchOverlay
+      ? applyOverlayToSpans(row.cell.spans, stackHighlightRanges, theme)
+      : undefined;
 
     if (!wrapLines) {
       baseRow = (
@@ -876,6 +973,7 @@ function renderRow(
               `${row.key}:stack`,
               codeHorizontalOffset,
               prefix,
+              stackHighlightSpans,
             )}
             {guideOnNewSide ? (
               <span key={`${row.key}:note-guide`} fg={theme.noteBorder}>
@@ -893,6 +991,7 @@ function renderRow(
         showLineNumbers,
         prefix.text.length,
         theme,
+        stackHighlightSpans,
       );
       const wrappedContentWidth = Math.max(
         0,
@@ -948,6 +1047,10 @@ interface DiffRowViewProps {
   anchorId?: string;
   noteGuideSide?: "old" | "new";
   onOpenAgentNotesAtHunk?: (hunkIndex: number) => void;
+  /** Lookup of search matches grouped by `searchRowKey`. Reference identity must change when matches change. */
+  searchMatchesByRow?: Map<string, SearchMatch[]>;
+  /** Active match identity. Used to flip a row to the active palette without comparing every match. */
+  searchActiveMatch?: SearchMatch | null;
 }
 
 /** Render one diff row, memoized to avoid unnecessary rerenders. */
@@ -966,7 +1069,12 @@ export const DiffRowView = memo(
     anchorId,
     noteGuideSide,
     onOpenAgentNotesAtHunk,
+    searchMatchesByRow,
+    searchActiveMatch,
   }: DiffRowViewProps) {
+    const overlay = searchMatchesByRow
+      ? { byRow: searchMatchesByRow, activeMatch: searchActiveMatch ?? null, theme }
+      : undefined;
     return renderRow(
       row,
       width,
@@ -981,6 +1089,7 @@ export const DiffRowView = memo(
       anchorId,
       noteGuideSide,
       onOpenAgentNotesAtHunk,
+      overlay,
     );
   },
   (previous, next) => {
@@ -996,7 +1105,9 @@ export const DiffRowView = memo(
       previous.selected === next.selected &&
       previous.annotated === next.annotated &&
       previous.anchorId === next.anchorId &&
-      previous.noteGuideSide === next.noteGuideSide
+      previous.noteGuideSide === next.noteGuideSide &&
+      previous.searchMatchesByRow === next.searchMatchesByRow &&
+      previous.searchActiveMatch === next.searchActiveMatch
     );
   },
 );

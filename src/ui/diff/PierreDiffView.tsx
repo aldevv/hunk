@@ -3,6 +3,7 @@ import type { DiffFile, LayoutMode } from "../../core/types";
 import { AgentInlineNote, AgentInlineNoteGuideCap } from "../components/panes/AgentInlineNote";
 import type { VisibleAgentNote } from "../lib/agentAnnotations";
 import { reviewRowId } from "../lib/ids";
+import type { SearchMatch } from "../lib/searchMatches";
 import type { AppTheme } from "../themes";
 import { findMaxLineNumber } from "./codeColumns";
 import { buildSplitRows, buildStackRows } from "./pierre";
@@ -30,6 +31,8 @@ export function PierreDiffView({
   selectedHunkIndex,
   shouldLoadHighlight = true,
   scrollable = true,
+  searchMatchesByRow,
+  searchActiveMatch,
 }: {
   annotatedHunkIndices?: Set<number>;
   codeHorizontalOffset?: number;
@@ -45,6 +48,8 @@ export function PierreDiffView({
   selectedHunkIndex: number;
   shouldLoadHighlight?: boolean;
   scrollable?: boolean;
+  searchMatchesByRow?: Map<string, SearchMatch[]>;
+  searchActiveMatch?: SearchMatch | null;
 }) {
   const resolvedHighlighted = useHighlightedDiff({
     file,
@@ -150,6 +155,8 @@ export function PierreDiffView({
               anchorId={plannedRow.anchorId}
               noteGuideSide={plannedRow.noteGuideSide}
               onOpenAgentNotesAtHunk={onOpenAgentNotesAtHunk}
+              searchMatchesByRow={searchMatchesByRow}
+              searchActiveMatch={searchActiveMatch}
             />
           </box>
         );

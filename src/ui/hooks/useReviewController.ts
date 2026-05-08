@@ -66,6 +66,14 @@ export interface ReviewController {
   moveToAnnotatedHunk: (delta: number) => void;
   moveToHunk: (delta: number) => void;
   scrollToNote: boolean;
+  /** Whether the search input is currently focused/active. */
+  searchActive: boolean;
+  /** Draft text being typed into the search input. */
+  searchDraft: string;
+  /** Stream-order cursor into the current match list, used by `n`/`N` navigation. */
+  searchMatchCursor: number;
+  /** Committed query that drives highlighting and match navigation. */
+  searchQuery: string;
   selectedFile: DiffFile | undefined;
   selectedFileId: string;
   selectedFileTopAlignRequestId: number;
@@ -86,14 +94,24 @@ export interface ReviewController {
     requestId: string,
     options?: { revealMode?: "none" | "first" },
   ) => AppliedCommentBatchResult;
+  /** Open the search input, seeding the draft from the committed query. */
+  beginSearch: () => void;
+  /** Hide the search input, clearing the committed query, draft, and highlights. */
+  cancelSearch: () => void;
   clearFilter: () => void;
   /** Drop every file mark, restoring all files to the review stream. */
   clearMarkedFiles: () => void;
   clearLiveComments: (filePath?: string) => ClearedCommentsResult;
+  /** Commit the current draft as the active search query, resetting the cursor. */
+  commitSearch: () => void;
+  /** Move the active match cursor by `delta`, wrapping modulo `matchCount`. */
+  moveSearchCursor: (delta: number, matchCount: number) => void;
   navigateToLocation: (input: NavigateToHunkToolInput) => NavigatedSelectionResult;
   removeLiveComment: (commentId: string) => RemovedCommentResult;
   selectFile: (fileId: string, nextHunkIndex?: number, options?: ReviewSelectionOptions) => void;
   selectHunk: (fileId: string, hunkIndex: number, options?: ReviewSelectionOptions) => void;
+  /** Update only the in-progress search draft without recomputing matches. */
+  setSearchDraft: (value: string) => void;
   setFilter: (value: string) => void;
   /** Toggle whether one file is marked as hidden from the review stream. */
   toggleMarkedFile: (fileId: string) => void;
@@ -105,6 +123,13 @@ export function useReviewController({ files }: { files: DiffFile[] }): ReviewCon
   // Marked files are kept in the sidebar but hidden from the review stream so the user can
   // narrow what they read without losing the ability to bring a file back.
   const [markedFileIds, setMarkedFileIds] = useState<ReadonlySet<string>>(() => new Set());
+  // Search has the same shape as filter: a typed-in `searchDraft` and a committed `searchQuery`.
+  // Highlights and match navigation read only the committed query, so editing the draft never
+  // disturbs the rendered match overlay.
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchDraft, setSearchDraftState] = useState("");
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchMatchCursor, setSearchMatchCursor] = useState(0);
   const [selectedFileId, setSelectedFileId] = useState(files[0]?.id ?? "");
   const [selectedHunkIndex, setSelectedHunkIndex] = useState(0);
   const [selectedFileTopAlignRequestId, setSelectedFileTopAlignRequestId] = useState(0);
@@ -279,6 +304,47 @@ export function useReviewController({ files }: { files: DiffFile[] }): ReviewCon
   /** Drop every file mark, restoring all files to the review stream. */
   const clearMarkedFiles = useCallback(() => {
     setMarkedFileIds((current) => (current.size === 0 ? current : new Set()));
+  }, []);
+
+  /** Open the search input. Seeds the draft from the active query so reopening shows the previous text. */
+  const beginSearch = useCallback(() => {
+    setSearchActive(true);
+    setSearchDraftState(searchQuery);
+  }, [searchQuery]);
+
+  /** Update the in-progress draft. Highlights only refresh when `commitSearch` runs. */
+  const setSearchDraft = useCallback((value: string) => {
+    setSearchDraftState(value);
+  }, []);
+
+  /** Promote the draft to the live query, resetting the cursor so the first match is active. */
+  const commitSearch = useCallback(() => {
+    setSearchQuery(searchDraft);
+    setSearchMatchCursor(0);
+  }, [searchDraft]);
+
+  /** Hide the input and remove every visible side-effect of the previous search. */
+  const cancelSearch = useCallback(() => {
+    setSearchActive(false);
+    setSearchQuery("");
+    setSearchDraftState("");
+    setSearchMatchCursor(0);
+  }, []);
+
+  /**
+   * Step the active match cursor. The caller passes the current match count so the controller
+   * stays decoupled from the App-level `findSearchMatches` derivation; if there are no matches,
+   * the cursor resets to 0.
+   */
+  const moveSearchCursor = useCallback((delta: number, matchCount: number) => {
+    if (matchCount <= 0) {
+      setSearchMatchCursor(0);
+      return;
+    }
+    setSearchMatchCursor((current) => {
+      const next = (((current + delta) % matchCount) + matchCount) % matchCount;
+      return next;
+    });
   }, []);
 
   /** Resolve one session-daemon navigation request against the current review state and select it. */
@@ -521,6 +587,10 @@ export function useReviewController({ files }: { files: DiffFile[] }): ReviewCon
     liveCommentsByFileId,
     markedFileIds,
     scrollToNote,
+    searchActive,
+    searchDraft,
+    searchMatchCursor,
+    searchQuery,
     selectedFile,
     selectedFileId,
     selectedFileTopAlignRequestId,
@@ -532,9 +602,13 @@ export function useReviewController({ files }: { files: DiffFile[] }): ReviewCon
     visibleFiles,
     addLiveComment,
     addLiveCommentBatch,
+    beginSearch,
+    cancelSearch,
     clearFilter,
     clearMarkedFiles,
     clearLiveComments,
+    commitSearch,
+    moveSearchCursor,
     moveToAnnotatedFile,
     moveToAnnotatedHunk,
     moveToHunk,
@@ -542,6 +616,7 @@ export function useReviewController({ files }: { files: DiffFile[] }): ReviewCon
     removeLiveComment,
     selectFile,
     selectHunk,
+    setSearchDraft,
     setFilter,
     toggleMarkedFile,
   };

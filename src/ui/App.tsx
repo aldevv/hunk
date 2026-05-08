@@ -25,10 +25,11 @@ import { useReviewController } from "./hooks/useReviewController";
 import { buildAppMenus } from "./lib/appMenus";
 import { fileRowId } from "./lib/ids";
 import { resolveResponsiveLayout } from "./lib/responsive";
+import { findSearchMatches, groupSearchMatchesByRow, type SearchMatch } from "./lib/searchMatches";
 import { resizeSidebarWidth } from "./lib/sidebar";
 import { resolveTheme, THEMES } from "./themes";
 
-type FocusArea = "files" | "filter";
+type FocusArea = "files" | "filter" | "search";
 
 const FAST_CODE_HORIZONTAL_SCROLL_COLUMNS = 8;
 
@@ -129,6 +130,26 @@ export function App({
   const clearMarkedFiles = review.clearMarkedFiles;
   const hiddenByMarkCount = review.hiddenByMarkCount;
 
+  // Search consumes only what the user can actually see. Marked or filtered-out files contribute
+  // no matches because they are absent from `review.visibleFiles`.
+  const searchMatches: SearchMatch[] = useMemo(
+    () => (review.searchQuery ? findSearchMatches(review.visibleFiles, review.searchQuery) : []),
+    [review.searchQuery, review.visibleFiles],
+  );
+  const searchMatchCount = searchMatches.length;
+  const safeSearchCursor =
+    searchMatchCount === 0
+      ? 0
+      : ((review.searchMatchCursor % searchMatchCount) + searchMatchCount) % searchMatchCount;
+  const activeSearchMatch =
+    searchMatchCount === 0 ? null : (searchMatches[safeSearchCursor] ?? null);
+  const searchOverlay = useMemo(
+    () =>
+      searchMatchCount === 0 ? null : groupSearchMatchesByRow(searchMatches, safeSearchCursor),
+    [safeSearchCursor, searchMatchCount, searchMatches],
+  );
+  const searchMatchesByRow = searchOverlay?.byRow;
+
   /** Toggle the focused file's mark via the global `m` shortcut. */
   const toggleSelectedFileMark = useCallback(() => {
     if (!selectedFile) {
@@ -136,6 +157,23 @@ export function App({
     }
     toggleMarkedFile(selectedFile.id);
   }, [selectedFile, toggleMarkedFile]);
+
+  // Track the active match identity so we navigate exactly once per change. Using the match object
+  // identity keeps the effect quiet when search-unrelated state churn touches the App tree.
+  const lastNavigatedMatchRef = useRef<SearchMatch | null>(null);
+  useEffect(() => {
+    if (!activeSearchMatch) {
+      lastNavigatedMatchRef.current = null;
+      return;
+    }
+    if (lastNavigatedMatchRef.current === activeSearchMatch) {
+      return;
+    }
+    lastNavigatedMatchRef.current = activeSearchMatch;
+    review.selectHunk(activeSearchMatch.fileId, activeSearchMatch.hunkIndex, {
+      scrollToNote: false,
+    });
+  }, [activeSearchMatch, review.selectHunk]);
 
   const jumpToFile = useCallback(
     (fileId: string, nextHunkIndex = 0, options?: { alignFileHeaderTop?: boolean }) => {
@@ -478,6 +516,34 @@ export function App({
     focusFiles();
   }, [focusFiles, review.setFilter]);
 
+  /** Open the search input in the status bar and seed it from the active query. */
+  const beginSearchAndFocus = useCallback(() => {
+    review.beginSearch();
+    setFocusArea("search");
+  }, [review.beginSearch]);
+
+  /** Cancel the active search, drop highlights, and return focus to the file list. */
+  const cancelSearchAndUnfocus = useCallback(() => {
+    review.cancelSearch();
+    focusFiles();
+  }, [focusFiles, review.cancelSearch]);
+
+  /** Commit the typed search draft and move focus back to the diff stream. */
+  const commitSearchAndUnfocus = useCallback(() => {
+    review.commitSearch();
+    focusFiles();
+  }, [focusFiles, review.commitSearch]);
+
+  /** Move forward through committed search matches; safe to call when there are none. */
+  const moveSearchCursorNext = useCallback(() => {
+    review.moveSearchCursor(1, searchMatchCount);
+  }, [review.moveSearchCursor, searchMatchCount]);
+
+  /** Move backward through committed search matches; safe to call when there are none. */
+  const moveSearchCursorPrev = useCallback(() => {
+    review.moveSearchCursor(-1, searchMatchCount);
+  }, [review.moveSearchCursor, searchMatchCount]);
+
   /** Cycle through the available built-in themes. */
   const cycleTheme = useCallback(() => {
     const currentIndex = THEMES.findIndex((theme) => theme.id === activeTheme.id);
@@ -489,10 +555,13 @@ export function App({
     () =>
       buildAppMenus({
         activeThemeId: activeTheme.id,
+        beginSearch: beginSearchAndFocus,
         canRefreshCurrentInput,
         clearMarkedFiles,
         focusFilter,
         layoutMode,
+        moveSearchCursorNext,
+        moveSearchCursorPrev,
         moveToAnnotatedFile,
         moveToAnnotatedHunk,
         moveToHunk: review.moveToHunk,
@@ -517,10 +586,13 @@ export function App({
       }),
     [
       activeTheme.id,
+      beginSearchAndFocus,
       canRefreshCurrentInput,
       clearMarkedFiles,
       focusFilter,
       layoutMode,
+      moveSearchCursorNext,
+      moveSearchCursorPrev,
       moveToAnnotatedFile,
       moveToAnnotatedHunk,
       requestQuit,
@@ -563,6 +635,7 @@ export function App({
   useAppKeyboardShortcuts({
     activeMenuId,
     activateCurrentMenuItem,
+    beginSearch: beginSearchAndFocus,
     canRefreshCurrentInput,
     clearMarkedFiles,
     closeHelp,
@@ -570,6 +643,8 @@ export function App({
     cycleTheme,
     focusArea,
     focusFilter,
+    moveSearchCursorNext,
+    moveSearchCursorPrev,
     moveToAnnotatedHunk,
     moveToHunk: review.moveToHunk,
     moveMenuItem,
@@ -578,6 +653,7 @@ export function App({
     requestQuit,
     scrollCodeHorizontally,
     scrollDiff,
+    searchHasMatches: searchMatchCount > 0,
     selectLayoutMode,
     showHelp,
     switchMenu,
@@ -750,6 +826,8 @@ export function App({
           selectedHunkRevealRequestId={review.selectedHunkRevealRequestId}
           theme={activeTheme}
           width={diffPaneWidth}
+          searchMatchesByRow={searchMatchesByRow}
+          searchActiveMatch={activeSearchMatch}
           onOpenAgentNotesAtHunk={openAgentNotesAtHunk}
           onScrollCodeHorizontally={(delta) => {
             scrollCodeHorizontally(delta * FAST_CODE_HORIZONTAL_SCROLL_COLUMNS);
@@ -761,17 +839,30 @@ export function App({
         />
       </box>
 
-      {!pagerMode && (focusArea === "filter" || Boolean(review.filter) || Boolean(noticeText)) ? (
+      {!pagerMode &&
+      (focusArea === "filter" ||
+        focusArea === "search" ||
+        Boolean(review.filter) ||
+        Boolean(review.searchQuery) ||
+        Boolean(noticeText)) ? (
         <StatusBar
           filter={review.filter}
           filterFocused={focusArea === "filter"}
           noticeText={noticeText ?? undefined}
           terminalWidth={terminal.width}
           theme={activeTheme}
+          searchActive={focusArea === "search"}
+          searchDraft={review.searchDraft}
+          searchQuery={review.searchQuery}
+          searchMatchCount={searchMatchCount}
+          searchCurrentIndex={searchMatchCount > 0 ? safeSearchCursor : 0}
           onCloseMenu={closeMenu}
           onFilterExit={clearFilterAndUnfocus}
           onFilterInput={review.setFilter}
           onFilterSubmit={focusFiles}
+          onSearchExit={cancelSearchAndUnfocus}
+          onSearchInput={review.setSearchDraft}
+          onSearchSubmit={commitSearchAndUnfocus}
         />
       ) : null}
 

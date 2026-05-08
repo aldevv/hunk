@@ -1474,6 +1474,59 @@ describe("UI components", () => {
     expect(frame).not.toContain("Update available:");
   });
 
+  test("StatusBar renders search mode with the M/N indicator", async () => {
+    const theme = resolveTheme("midnight", null);
+    const frame = await captureFrame(
+      <StatusBar
+        filter=""
+        filterFocused={false}
+        searchActive={true}
+        searchDraft="foo"
+        searchQuery="foo"
+        searchMatchCount={5}
+        searchCurrentIndex={1}
+        terminalWidth={60}
+        theme={theme}
+        onCloseMenu={() => {}}
+        onFilterInput={() => {}}
+        onFilterSubmit={() => {}}
+        onSearchInput={() => {}}
+        onSearchSubmit={() => {}}
+      />,
+      60,
+      3,
+    );
+
+    expect(frame).toContain("search:");
+    // 0-based cursor 1 plus one means the indicator reads `2/5`.
+    expect(frame).toContain("2/5");
+  });
+
+  test("StatusBar renders a passive search summary when no input is focused", async () => {
+    const theme = resolveTheme("midnight", null);
+    const frame = await captureFrame(
+      <StatusBar
+        filter=""
+        filterFocused={false}
+        searchActive={false}
+        searchDraft=""
+        searchQuery="alpha"
+        searchMatchCount={3}
+        searchCurrentIndex={0}
+        terminalWidth={60}
+        theme={theme}
+        onCloseMenu={() => {}}
+        onFilterInput={() => {}}
+        onFilterSubmit={() => {}}
+      />,
+      60,
+      3,
+    );
+
+    expect(frame).toContain("search=alpha");
+    expect(frame).toContain("1/3");
+  });
+
   test("StatusBar keeps filter summary precedence over a notice", async () => {
     const theme = resolveTheme("midnight", null);
     const frame = await captureFrame(
@@ -1500,13 +1553,13 @@ describe("UI components", () => {
     const frame = await captureFrame(
       <HelpDialog
         canRefresh={true}
-        terminalHeight={36}
+        terminalHeight={40}
         terminalWidth={76}
         theme={theme}
         onClose={() => {}}
       />,
       76,
-      36,
+      40,
     );
 
     const expectedRows = [
@@ -1532,6 +1585,8 @@ describe("UI components", () => {
       "l / w / H       lines / wrap / metadata",
       "Review",
       "f               focus file filter",
+      "/               search diff text",
+      "n / N           next / previous match",
       "m / M           mark file / unmark all",
       "Tab             toggle files/filter focus",
       "F10             open menus",

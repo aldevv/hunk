@@ -4,10 +4,13 @@ import { THEMES } from "../themes";
 
 export interface BuildAppMenusOptions {
   activeThemeId: string;
+  beginSearch: () => void;
   canRefreshCurrentInput: boolean;
   clearMarkedFiles: () => void;
   focusFilter: () => void;
   layoutMode: LayoutMode;
+  moveSearchCursorNext: () => void;
+  moveSearchCursorPrev: () => void;
   moveToAnnotatedFile: (delta: number) => void;
   moveToAnnotatedHunk: (delta: number) => void;
   moveToHunk: (delta: number) => void;
@@ -34,10 +37,13 @@ export interface BuildAppMenusOptions {
 /** Build the top-level app menus from the current app state and actions. */
 export function buildAppMenus({
   activeThemeId,
+  beginSearch,
   canRefreshCurrentInput,
   clearMarkedFiles,
   focusFilter,
   layoutMode,
+  moveSearchCursorNext,
+  moveSearchCursorPrev,
   moveToAnnotatedFile,
   moveToAnnotatedHunk,
   moveToHunk,
@@ -205,8 +211,27 @@ export function buildAppMenus({
       { kind: "separator" },
       {
         kind: "item",
-        label: "Focus filter",
+        label: "Search diff text",
         hint: "/",
+        action: beginSearch,
+      },
+      {
+        kind: "item",
+        label: "Next match",
+        hint: "n",
+        action: moveSearchCursorNext,
+      },
+      {
+        kind: "item",
+        label: "Previous match",
+        hint: "N",
+        action: moveSearchCursorPrev,
+      },
+      { kind: "separator" },
+      {
+        kind: "item",
+        label: "Focus filter",
+        hint: "f",
         action: focusFilter,
       },
     ],

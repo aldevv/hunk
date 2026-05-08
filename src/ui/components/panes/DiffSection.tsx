@@ -3,6 +3,7 @@ import type { DiffFile, LayoutMode } from "../../../core/types";
 import { PierreDiffView } from "../../diff/PierreDiffView";
 import { getAnnotatedHunkIndices, type VisibleAgentNote } from "../../lib/agentAnnotations";
 import { diffSectionId } from "../../lib/ids";
+import type { SearchMatch } from "../../lib/searchMatches";
 import { fitText } from "../../lib/text";
 import type { AppTheme } from "../../themes";
 import { DiffFileHeaderRow } from "./DiffFileHeaderRow";
@@ -24,6 +25,8 @@ interface DiffSectionProps {
   theme: AppTheme;
   visibleAgentNotes: VisibleAgentNote[];
   viewWidth: number;
+  searchMatchesByRow?: Map<string, SearchMatch[]>;
+  searchActiveMatch?: SearchMatch | null;
   onOpenAgentNotesAtHunk: (hunkIndex: number) => void;
   onSelect: () => void;
 }
@@ -46,6 +49,8 @@ function DiffSectionComponent({
   theme,
   visibleAgentNotes,
   viewWidth,
+  searchMatchesByRow,
+  searchActiveMatch,
   onOpenAgentNotesAtHunk,
   onSelect,
 }: DiffSectionProps) {
@@ -99,6 +104,8 @@ function DiffSectionComponent({
         onOpenAgentNotesAtHunk={onOpenAgentNotesAtHunk}
         selectedHunkIndex={selectedHunkIndex}
         shouldLoadHighlight={shouldLoadHighlight}
+        searchMatchesByRow={searchMatchesByRow}
+        searchActiveMatch={searchActiveMatch}
         // The parent review stream owns scrolling across files.
         scrollable={false}
       />
@@ -125,6 +132,8 @@ export const DiffSection = memo(DiffSectionComponent, (previous, next) => {
     previous.showSeparator === next.showSeparator &&
     previous.theme === next.theme &&
     previous.visibleAgentNotes === next.visibleAgentNotes &&
-    previous.viewWidth === next.viewWidth
+    previous.viewWidth === next.viewWidth &&
+    previous.searchMatchesByRow === next.searchMatchesByRow &&
+    previous.searchActiveMatch === next.searchActiveMatch
   );
 });

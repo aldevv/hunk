@@ -35,6 +35,14 @@ export interface AppTheme {
   noteBackground: string;
   noteTitleBackground: string;
   noteTitleText: string;
+  /** Background tint for inactive search-match highlights inside diff rows. */
+  searchHighlightBg: string;
+  /** Foreground for inactive search-match highlights inside diff rows. */
+  searchHighlightFg: string;
+  /** Background tint for the currently active (cursor-current) search match. */
+  searchActiveHighlightBg: string;
+  /** Foreground for the currently active (cursor-current) search match. */
+  searchActiveHighlightFg: string;
   syntaxColors: SyntaxColors;
   syntaxStyle: SyntaxStyle;
 }
@@ -124,6 +132,10 @@ export const THEMES: AppTheme[] = [
       noteBackground: "#241c31",
       noteTitleBackground: "#322446",
       noteTitleText: "#f5edff",
+      searchHighlightBg: "#5a4a1c",
+      searchHighlightFg: "#fff8d6",
+      searchActiveHighlightBg: "#d6b347",
+      searchActiveHighlightFg: "#1a1408",
     },
     {
       default: "#f2f4f6",
@@ -173,6 +185,10 @@ export const THEMES: AppTheme[] = [
       noteBackground: "#211a36",
       noteTitleBackground: "#30234f",
       noteTitleText: "#f5eeff",
+      searchHighlightBg: "#5b4316",
+      searchHighlightFg: "#fff5cc",
+      searchActiveHighlightBg: "#e8c64a",
+      searchActiveHighlightFg: "#161009",
     },
     {
       default: "#e8f1ff",
@@ -222,6 +238,10 @@ export const THEMES: AppTheme[] = [
       noteBackground: "#efe6ff",
       noteTitleBackground: "#e3d7ff",
       noteTitleText: "#462b74",
+      searchHighlightBg: "#fbe7a3",
+      searchHighlightFg: "#3d2a05",
+      searchActiveHighlightBg: "#f1ad33",
+      searchActiveHighlightFg: "#1a1304",
     },
     {
       default: "#2f2417",
@@ -271,6 +291,10 @@ export const THEMES: AppTheme[] = [
       noteBackground: "#311d36",
       noteTitleBackground: "#452650",
       noteTitleText: "#fff0ff",
+      searchHighlightBg: "#6a3a14",
+      searchHighlightFg: "#ffe7c2",
+      searchActiveHighlightBg: "#e89641",
+      searchActiveHighlightFg: "#1a0d04",
     },
     {
       default: "#fff0e6",
